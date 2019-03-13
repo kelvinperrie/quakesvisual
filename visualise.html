@@ -1,0 +1,208 @@
+﻿<!DOCTYPE html>
+<html lang="en-nz">
+
+<head>
+    <title>Quake Visualisation</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <style>
+        /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+        
+        #map {
+            height: 100%;
+        }
+        
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+            font-size: 15px;
+        }
+
+        #current-time-container {
+            position:absolute;
+            z-index: 100;
+            width: 100%;
+            text-align: center;
+            font-size: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="current-time-container"></div>
+    <div id="map"></div>
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDzfpFt6f4Tz9MUjQed0SoIVfbDaUHfavE"></script>
+    <script type="text/javascript" src="jquery-3.1.1.min.js"></script>
+    <script type="text/javascript" src="moment.js"></script>
+    <script type="text/javascript" src="events.js"></script>
+    <script>
+        // we have to store a whole heap of stuff globally so that we can manipulate later if the user does something. Users!
+        var map;
+        var events = {};
+        var startMoment;
+        var endMoment;
+        var currentMoment;
+
+        function createCORSRequest(method, url) {
+            var xhr = new XMLHttpRequest();
+            if ("withCredentials" in xhr) {
+
+                // Check if the XMLHttpRequest object has a "withCredentials" property.
+                // "withCredentials" only exists on XMLHTTPRequest2 objects.
+                xhr.open(method, url, true);
+
+            } else if (typeof XDomainRequest != "undefined") {
+
+                // Otherwise, check if XDomainRequest.
+                // XDomainRequest only exists in IE, and is IE's way of making CORS requests.
+                xhr = new XDomainRequest();
+                xhr.open(method, url);
+
+            } else {
+
+                // Otherwise, CORS is not supported by the browser.
+                xhr = null;
+
+            }
+            return xhr;
+        }
+        var searchUrl = "https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
+        //searchUrl = "https://cors.io/?https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
+
+        var xhr = createCORSRequest('GET', searchUrl);
+        if (!xhr) {
+            alert("error");
+            //throw new Error('CORS not supported');
+        }
+        console.log(xhr);
+
+        xhr.onload = function () {
+            var responseText = xhr.responseText;
+            console.log(responseText);
+            // process the response.
+        };
+
+        xhr.onerror = function () {
+            console.log('There was an error!');
+        };
+        //xhr.send();
+
+
+
+        // sets up everything
+        function initMap() {
+            var uluru = {
+                lat: -40.541111,
+                lng: 173.778389
+            };
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: uluru,
+                zoom: 6,
+                styles: [{
+                    featureType: 'poi',
+                    stylers: [{
+                        visibility: 'off'
+                    }]
+                }, {
+                    featureType: 'transit',
+                    elementType: 'labels.icon',
+                    stylers: [{
+                        visibility: 'off'
+                    }]
+                }]
+            });
+
+            setupData();
+
+            currentMoment = moment(startMoment);
+            OutPutEventsForCurrentMoment();
+        }
+
+        function setupData() {
+            // organise our data in a way we can easily access it by datetime
+            //for (var i = 0; i < 10; i++) {
+            for (var i = 0; i < eventData.features.length; i++) {
+                var eventFromData = eventData.features[i];
+                var eventTime = moment(eventFromData.properties.origintime);
+                var eventIndex = eventTime.format("YYYYMMDDHH");
+                var dataForIndexing = {
+                    "lat": eventFromData.geometry.coordinates[1],
+                    "lng": eventFromData.geometry.coordinates[0],
+                    "time": eventFromData.properties.origintime,
+                    "magnitude": eventFromData.properties.magnitude,
+                    "depth": eventFromData.properties.depth,
+                };
+                if (!events[eventIndex]) {
+                    events[eventIndex] = [];
+                    events[eventIndex].push(dataForIndexing);
+                } else {
+                    events[eventIndex].push(dataForIndexing);
+                }
+            }
+            console.log(events);
+
+            var startdate = '2019-02-01T00:00:00Z';
+            var enddate = '2019-02-28T23:00:00Z';
+            startMoment = moment(startdate);
+            console.log(startMoment);
+            endMoment = moment(enddate);
+            console.log(endMoment);
+        }
+
+        function OutPutEventsForCurrentMoment() {
+            if (currentMoment.isBefore(endMoment) || currentMoment.isSame(endMoment)) {
+                var currentIndex = currentMoment.format("YYYYMMDDHH");
+                $("#current-time-container").html(currentMoment.format("dddd, MMMM Do, h a"));
+                console.log(currentIndex);
+                var currentEvents = events[currentIndex];
+                if (currentEvents) {
+                    console.log("found events");
+                    for(var i = 0; i < currentEvents.length; i++) {
+                        var marker = new google.maps.Circle({
+                            strokeColor: "#000",
+                            strokeOpacity: 0.8,
+                            strokeWeight: 2,
+                            fillColor: "#000",
+                            fillOpacity: 0.3,
+                            map: map,
+                            center: new google.maps.LatLng(currentEvents[i].lat, currentEvents[i].lng),
+                            radius: 10000
+                        });
+                        FadeMe(marker);
+
+                        console.log("added marker");
+                    }
+                }
+                currentMoment.add(moment.duration(1, 'hours'));
+                setTimeout(function () { OutPutEventsForCurrentMoment(); }, 1000);
+            }
+        }
+
+        function FadeMe(marker) {
+            var fillOpacity = marker.get("fillOpacity");
+            fillOpacity -= 0.02;
+            if (fillOpacity < 0) fillOpacity = 0.0;
+            var strokeOpacity = marker.get("strokeOpacity");
+            strokeOpacity -= 0.05;
+            if (strokeOpacity < 0) strokeOpacity = 0.0;
+
+            var radius = marker.get("radius");
+            radius += 3000;
+            marker.setOptions({ fillOpacity: fillOpacity, strokeOpacity: strokeOpacity, radius: radius });
+
+            if (strokeOpacity === 0 && fillOpacity === 0) return;
+
+            setTimeout(function () { FadeMe(marker); }, 100);
+        }
+
+        google.maps.event.addDomListener(window, 'load', initMap);
+    </script>
+
+</body>
+
+</html>
