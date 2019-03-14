@@ -21,19 +21,60 @@
             font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
             font-size: 15px;
         }
-
-        #current-time-container {
-            position:absolute;
+        #info-container {
+            width: 600px;
+            margin: auto;
+            /*position: absolute;
             z-index: 100;
-            width: 100%;
+            width: 100%;*/
             text-align: center;
+        }
+        #current-time-container {
             font-size: 30px;
+        }
+        #speed-controls {
+
+        }
+        #legend-mate {
+            position: absolute;
+            z-index: 100;
+            bottom: 0;
+            left: 0;
+            background-color: #fff;
+            padding: 5px;
+            padding-bottom: 10px;
+        }
+        .title {
+            font-weight: bold;
+        }
+        .almost-a-link {
+            text-decoration: underline;
+            cursor: pointer;
+            user-select: none;
+        }
+        #legend-shallow, #legend-intermediate, #legend-deep {
+            color: #fff;
+            padding: 0 5px;
         }
     </style>
 </head>
 
 <body>
-    <div id="current-time-container"></div>
+    <div id="info-container">
+        <div id="current-time-container"></div>
+        <div id="speed-controls">
+            <span class="almost-a-link" id="tick-faster-trigger">go faster</span>
+            <span class="almost-a-link" id="tick-pause-trigger">pause</span>
+            <span class="almost-a-link" id="tick-slower-trigger">go slower</span>
+        </div>
+    </div>
+    <div id="legend-mate">
+        <span class="title">Legend:</span><br />
+        Bigger circles = bigger magnitude<br />
+        <div id="legend-shallow">red = shallow depth (less than <span></span>)</div>
+        <div id="legend-intermediate">blue = intermediate depth (less than <span></span>)</div>
+        <div id="legend-deep">green = deep depth</div>
+    </div>
     <div id="map"></div>
 
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDzfpFt6f4Tz9MUjQed0SoIVfbDaUHfavE"></script>
@@ -41,12 +82,57 @@
     <script type="text/javascript" src="moment.js"></script>
     <script type="text/javascript" src="events.js"></script>
     <script>
-        // we have to store a whole heap of stuff globally so that we can manipulate later if the user does something. Users!
+
+        $(document).ready(function () {
+            $('#tick-faster-trigger').click(function () { tickFaster(); });
+            $('#tick-slower-trigger').click(function () { tickSlower(); });
+            $('#tick-pause-trigger').click(function () { tickPause(); });
+
+            $("#legend-shallow span").text(maxDepthShallow);
+            $("#legend-intermediate span").text(maxDepthIntermediate);
+            $("#legend-shallow").css('background-color', colourShallow);
+            $("#legend-intermediate").css('background-color', colourIntermediate);
+            $("#legend-deep").css('background-color', colourDeep);
+        });
+
         var map;
         var events = {};
         var startMoment;
         var endMoment;
         var currentMoment;
+        var tickSpeed = 50;
+        var fadeTimeout = 50;
+        var speedIncrement = 50;
+        var status = "running";
+        var nextTickTimout;
+        var colourShallow = "#f44242";
+        var colourIntermediate = "#414ff4";
+        var colourDeep = "#56c633";
+        var maxDepthShallow = 30;
+        var maxDepthIntermediate = 70;
+
+        function tickFaster() {
+            var minTickSpeed = 0;
+            if (tickSpeed === minTickSpeed) { return; }
+            tickSpeed -= speedIncrement;
+            if (tickSpeed < minTickSpeed) {
+                tickSpeed = minTickSpeed;
+            }
+        }
+        function tickSlower() {
+            tickSpeed += speedIncrement;
+        }
+        function tickPause() {
+            if (status === 'paused') {
+                status = 'running';
+                $("#tick-pause-trigger").html('pause');
+                OutPutEventsForCurrentMoment();
+            } else {
+                clearTimeout(nextTickTimout); // cancel the next tick if it's set to go
+                status = 'paused';
+                $("#tick-pause-trigger").html('start!');
+            }
+        }
 
         function createCORSRequest(method, url) {
             var xhr = new XMLHttpRequest();
@@ -129,7 +215,7 @@
             for (var i = 0; i < eventData.features.length; i++) {
                 var eventFromData = eventData.features[i];
                 var eventTime = moment(eventFromData.properties.origintime);
-                var eventIndex = eventTime.format("YYYYMMDDHH");
+                var eventIndex = eventTime.format("YYYYMMDDHHmm");
                 var dataForIndexing = {
                     "lat": eventFromData.geometry.coordinates[1],
                     "lng": eventFromData.geometry.coordinates[0],
@@ -156,30 +242,48 @@
 
         function OutPutEventsForCurrentMoment() {
             if (currentMoment.isBefore(endMoment) || currentMoment.isSame(endMoment)) {
-                var currentIndex = currentMoment.format("YYYYMMDDHH");
-                $("#current-time-container").html(currentMoment.format("dddd, MMMM Do, h a"));
-                console.log(currentIndex);
+                var currentIndex = currentMoment.format("YYYYMMDDHHmm");
+                $("#current-time-container").html(currentMoment.format("dddd, MMMM Do, hh:mm a"));
+                //console.log(currentIndex);
                 var currentEvents = events[currentIndex];
                 if (currentEvents) {
-                    console.log("found events");
-                    for(var i = 0; i < currentEvents.length; i++) {
+                    //console.log("found events");
+                    for (var i = 0; i < currentEvents.length; i++) {
+
+                        var outputMag = "Magnatude: " + currentEvents[i].magnitude;
+                        var outputDepth = "Depth: " + currentEvents[i].depth;
+                        var outputDetails = outputMag.padEnd(25, ' ') + outputDepth.padEnd(25, ' ');
+                        console.log(outputDetails);
+
+                        var colour;
+                        if (currentEvents[i].depth <= maxDepthShallow) {
+                            colour = colourShallow;
+                        } else if (currentEvents[i].depth <= maxDepthIntermediate) {
+                            colour = colourIntermediate;
+                        } else {
+                            colour = colourDeep;
+                        }
+
                         var marker = new google.maps.Circle({
-                            strokeColor: "#000",
-                            strokeOpacity: 0.8,
+                            strokeColor: colour,
+                            strokeOpacity: 1,
                             strokeWeight: 2,
-                            fillColor: "#000",
-                            fillOpacity: 0.3,
+                            fillColor: colour,
+                            fillOpacity: 1,
                             map: map,
                             center: new google.maps.LatLng(currentEvents[i].lat, currentEvents[i].lng),
                             radius: 10000
                         });
+                        marker.magnitude = currentEvents[i].magnitude;
                         FadeMe(marker);
 
-                        console.log("added marker");
+                        //console.log("added marker");
                     }
                 }
-                currentMoment.add(moment.duration(1, 'hours'));
-                setTimeout(function () { OutPutEventsForCurrentMoment(); }, 1000);
+                currentMoment.add(moment.duration(10, 'minutes'));
+                if (status === 'running') {
+                    nextTickTimout = setTimeout(function () { OutPutEventsForCurrentMoment(); }, tickSpeed);
+                }
             }
         }
 
@@ -192,12 +296,13 @@
             if (strokeOpacity < 0) strokeOpacity = 0.0;
 
             var radius = marker.get("radius");
-            radius += 3000;
+            var incrememt = marker.magnitude * 1000;
+            radius += incrememt;
             marker.setOptions({ fillOpacity: fillOpacity, strokeOpacity: strokeOpacity, radius: radius });
 
             if (strokeOpacity === 0 && fillOpacity === 0) return;
 
-            setTimeout(function () { FadeMe(marker); }, 100);
+            setTimeout(function () { FadeMe(marker); }, fadeTimeout);
         }
 
         google.maps.event.addDomListener(window, 'load', initMap);
