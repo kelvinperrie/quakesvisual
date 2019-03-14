@@ -1,5 +1,5 @@
 # quakesvisual
-A test of visualising earthquakes across NZ. Data is from GeoNet (https://quakesearch.geonet.org.nz/).
+A test of visualising earthquakes across NZ. Data is from GeoNet (https://quakesearch.geonet.org.nz/), thanks GeoNet!
 
 
 Here's what it looks like:
