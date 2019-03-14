@@ -22,12 +22,12 @@
             font-size: 15px;
         }
         #info-container {
-            width: 600px;
+            width: 100%;
             margin: auto;
-            /*position: absolute;
-            z-index: 100;
-            width: 100%;*/
             text-align: center;
+            position: fixed;
+            z-index: 100;
+            background-color: #fff;
         }
         #current-time-container {
             font-size: 30px;
@@ -56,6 +56,9 @@
             color: #fff;
             padding: 0 5px;
         }
+        #speed-display {
+            color: #808080;
+        }
     </style>
 </head>
 
@@ -66,6 +69,7 @@
             <span class="almost-a-link" id="tick-faster-trigger">go faster</span>
             <span class="almost-a-link" id="tick-pause-trigger">pause</span>
             <span class="almost-a-link" id="tick-slower-trigger">go slower</span>
+            <span class="" id="speed-display">current speed is: <span id="speed-value"></span></span>
         </div>
     </div>
     <div id="legend-mate">
@@ -93,6 +97,7 @@
             $("#legend-shallow").css('background-color', colourShallow);
             $("#legend-intermediate").css('background-color', colourIntermediate);
             $("#legend-deep").css('background-color', colourDeep);
+            $("#speed-value").text(tickSpeed);
         });
 
         var map;
@@ -102,7 +107,7 @@
         var currentMoment;
         var tickSpeed = 50;
         var fadeTimeout = 50;
-        var speedIncrement = 50;
+        var speedIncrement = 30;
         var status = "running";
         var nextTickTimout;
         var colourShallow = "#f44242";
@@ -118,9 +123,11 @@
             if (tickSpeed < minTickSpeed) {
                 tickSpeed = minTickSpeed;
             }
+            updateSpeedDisplay();
         }
         function tickSlower() {
             tickSpeed += speedIncrement;
+            updateSpeedDisplay();
         }
         function tickPause() {
             if (status === 'paused') {
@@ -132,50 +139,61 @@
                 status = 'paused';
                 $("#tick-pause-trigger").html('start!');
             }
+            updateSpeedDisplay();
         }
-
-        function createCORSRequest(method, url) {
-            var xhr = new XMLHttpRequest();
-            if ("withCredentials" in xhr) {
-
-                // Check if the XMLHttpRequest object has a "withCredentials" property.
-                // "withCredentials" only exists on XMLHTTPRequest2 objects.
-                xhr.open(method, url, true);
-
-            } else if (typeof XDomainRequest != "undefined") {
-
-                // Otherwise, check if XDomainRequest.
-                // XDomainRequest only exists in IE, and is IE's way of making CORS requests.
-                xhr = new XDomainRequest();
-                xhr.open(method, url);
-
-            } else {
-
-                // Otherwise, CORS is not supported by the browser.
-                xhr = null;
-
+        function updateSpeedDisplay() {
+            var displayValue = tickSpeed;
+            if (displayValue == 0) {
+                displayValue = "MAX";
             }
-            return xhr;
+            if (status === 'paused') {
+                displayValue = status;
+            }
+            $("#speed-value").text(displayValue);
         }
-        var searchUrl = "https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
-        //searchUrl = "https://cors.io/?https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
 
-        var xhr = createCORSRequest('GET', searchUrl);
-        if (!xhr) {
-            alert("error");
-            //throw new Error('CORS not supported');
-        }
-        console.log(xhr);
+        //function createCORSRequest(method, url) {
+        //    var xhr = new XMLHttpRequest();
+        //    if ("withCredentials" in xhr) {
 
-        xhr.onload = function () {
-            var responseText = xhr.responseText;
-            console.log(responseText);
-            // process the response.
-        };
+        //        // Check if the XMLHttpRequest object has a "withCredentials" property.
+        //        // "withCredentials" only exists on XMLHTTPRequest2 objects.
+        //        xhr.open(method, url, true);
 
-        xhr.onerror = function () {
-            console.log('There was an error!');
-        };
+        //    } else if (typeof XDomainRequest != "undefined") {
+
+        //        // Otherwise, check if XDomainRequest.
+        //        // XDomainRequest only exists in IE, and is IE's way of making CORS requests.
+        //        xhr = new XDomainRequest();
+        //        xhr.open(method, url);
+
+        //    } else {
+
+        //        // Otherwise, CORS is not supported by the browser.
+        //        xhr = null;
+
+        //    }
+        //    return xhr;
+        //}
+        //var searchUrl = "https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
+        ////searchUrl = "https://cors.io/?https://quakesearch.geonet.org.nz/geojson?bbox=163.95996,-49.18170,182.63672,-32.28713&startdate=2019-2-6T23:00:00&enddate=2019-3-7T0:00:00";
+
+        //var xhr = createCORSRequest('GET', searchUrl);
+        //if (!xhr) {
+        //    alert("error");
+        //    //throw new Error('CORS not supported');
+        //}
+        //console.log(xhr);
+
+        //xhr.onload = function () {
+        //    var responseText = xhr.responseText;
+        //    console.log(responseText);
+        //    // process the response.
+        //};
+
+        //xhr.onerror = function () {
+        //    console.log('There was an error!');
+        //};
         //xhr.send();
 
 
@@ -211,7 +229,6 @@
 
         function setupData() {
             // organise our data in a way we can easily access it by datetime
-            //for (var i = 0; i < 10; i++) {
             for (var i = 0; i < eventData.features.length; i++) {
                 var eventFromData = eventData.features[i];
                 var eventTime = moment(eventFromData.properties.origintime);
@@ -230,31 +247,28 @@
                     events[eventIndex].push(dataForIndexing);
                 }
             }
-            console.log(events);
 
             var startdate = '2019-02-01T00:00:00Z';
             var enddate = '2019-02-28T23:00:00Z';
             startMoment = moment(startdate);
-            console.log(startMoment);
             endMoment = moment(enddate);
-            console.log(endMoment);
         }
 
+        /// this method runs every iteraction (currently every 10 minutes)
         function OutPutEventsForCurrentMoment() {
             if (currentMoment.isBefore(endMoment) || currentMoment.isSame(endMoment)) {
                 var currentIndex = currentMoment.format("YYYYMMDDHHmm");
                 $("#current-time-container").html(currentMoment.format("dddd, MMMM Do, hh:mm a"));
-                //console.log(currentIndex);
                 var currentEvents = events[currentIndex];
                 if (currentEvents) {
-                    //console.log("found events");
                     for (var i = 0; i < currentEvents.length; i++) {
 
+                        // output each event details to the console
                         var outputMag = "Magnatude: " + currentEvents[i].magnitude;
                         var outputDepth = "Depth: " + currentEvents[i].depth;
                         var outputDetails = outputMag.padEnd(25, ' ') + outputDepth.padEnd(25, ' ');
                         console.log(outputDetails);
-
+                        
                         var colour;
                         if (currentEvents[i].depth <= maxDepthShallow) {
                             colour = colourShallow;
@@ -264,6 +278,7 @@
                             colour = colourDeep;
                         }
 
+                        // draw a circle for this event
                         var marker = new google.maps.Circle({
                             strokeColor: colour,
                             strokeOpacity: 1,
@@ -275,11 +290,12 @@
                             radius: 10000
                         });
                         marker.magnitude = currentEvents[i].magnitude;
+                        // trigger the animation for the marker
                         FadeMe(marker);
 
-                        //console.log("added marker");
                     }
                 }
+                // move to the next time iteration and call this method again
                 currentMoment.add(moment.duration(10, 'minutes'));
                 if (status === 'running') {
                     nextTickTimout = setTimeout(function () { OutPutEventsForCurrentMoment(); }, tickSpeed);
